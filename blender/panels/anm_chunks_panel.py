@@ -5,8 +5,8 @@ from bpy.props import (BoolProperty, CollectionProperty, IntProperty,
                        StringProperty)
 from bpy.types import Action, Panel, PropertyGroup
 
-from ...xfbin_lib.xfbin.structure.nucc import NuccChunkAnm, NuccChunkCamera
-from ...xfbin_lib.xfbin.structure.anm import AnmClump, AnmBone, AnmModel, AnmKeyframe
+from ...xfbin_lib.xfbin.structure.nucc import NuccChunkAnm, NuccChunkCamera, NuccChunkLightDirc, NuccChunkLightPoint, NuccChunkAmbient
+from ...xfbin_lib.xfbin.structure.anm import AnmClump, AnmBone, AnmModel
 from ..common.helpers import XFBIN_ANMS_OBJ
 from ..importer import make_actions
 from .common import draw_xfbin_list
@@ -33,7 +33,74 @@ class CameraPropertyGroup(PropertyGroup):
         if camera:
             self.name = camera.name
             self.path = camera.filePath
+    
 
+class LightDircPropertyGroup(PropertyGroup):
+    def update_lightdirc_name(self, context):
+        self.update_name()
+
+    name: StringProperty(
+        name="Name",
+        default='new_lightdirc',
+        update=update_lightdirc_name,
+    )
+
+    path: StringProperty(name="Path")
+
+    lightdirc_index: IntProperty(name="Index")
+
+    def update_name(self):
+        self.name = self.name
+
+    def init_data(self, lightdirc: Optional[NuccChunkLightDirc] = None):
+        if lightdirc:
+            self.name = lightdirc.name
+            self.path = lightdirc.filePath
+
+class LightPointPropertyGroup(PropertyGroup):
+    def update_lightpoint_name(self, context):
+        self.update_name()
+
+    name: StringProperty(
+        name="Name",
+        default='new_lightpoint',
+        update=update_lightpoint_name,
+    )
+
+    path: StringProperty(name="Path")
+
+    lightpoint_index: IntProperty(name="Index")
+
+    def update_name(self):
+        self.name = self.name
+
+    def init_data(self, lightpoint: Optional[NuccChunkLightPoint] = None):
+        if lightpoint:
+            self.name = lightpoint.name
+            self.path = lightpoint.filePath
+
+
+class AmbientPropertyGroup(PropertyGroup):
+    def update_ambient_name(self, context):
+        self.update_name()
+
+    name: StringProperty(
+        name="Name",
+        default='new_ambient',
+        update=update_ambient_name,
+    )
+
+    path: StringProperty(name="Path")
+
+    ambient_index: IntProperty(name="Index")
+
+    def update_name(self):
+        self.name = self.name
+
+    def init_data(self, ambient: Optional[NuccChunkAmbient] = None):
+        if ambient:
+            self.name = ambient.name
+            self.path = ambient.filePath
 
 
 
@@ -61,13 +128,13 @@ class AnmClumpModelPropertyGroup(PropertyGroup):
 
 
 class AnmClumpPropertyGroup(PropertyGroup):
-    def update_name(self, context):
+    def update_clump_name(self, context):
         self.update_name()
 
     name: StringProperty(
         name="Name",
         default='new_clump',
-        update=update_name,
+        update=update_clump_name,
     )
 
     clump_index: IntProperty(name="Clump Index")
@@ -112,6 +179,16 @@ class XfbinAnmChunkPropertyGroup(PropertyGroup):
 
     frame_size: IntProperty(name="Frame Size", default=100)
 
+    export_material_animations: BoolProperty(
+        name="Export material animations", 
+        description="Exports material actions if there are any",
+        default=True)
+    
+    clean_keyframes: BoolProperty(
+        name="Clean keyframes",
+        description="Optimize animation by removing keyframes that are not needed",
+        default=True)
+
     clump_index: IntProperty()
 
     anm_clumps: CollectionProperty(
@@ -119,15 +196,31 @@ class XfbinAnmChunkPropertyGroup(PropertyGroup):
     )
 
     camera_index: IntProperty()
-
     cameras: CollectionProperty(
         type=CameraPropertyGroup,
+    )
+
+    lightdirc_index: IntProperty()
+    lightdircs: CollectionProperty(
+        type=LightDircPropertyGroup,
+    )
+
+    lightpoint_index: IntProperty()
+    lightpoints: CollectionProperty(
+        type=LightPointPropertyGroup,
+    )
+
+    ambient_index: IntProperty()
+    ambients: CollectionProperty(
+        type=AmbientPropertyGroup,
     )
 
     def update_name(self):
         self.name = self.anm_name
 
-    def init_data(self, anm: NuccChunkAnm, camera: Optional[NuccChunkCamera], actions: List[Action] = None):
+    def init_data(self, anm: NuccChunkAnm, camera: Optional[NuccChunkCamera], lightdirc: Optional[NuccChunkLightDirc],
+                lightpoint: Optional[NuccChunkLightPoint], ambient: Optional[NuccChunkAmbient], actions: List[Action] = None):
+        
         self.anm_name = anm.name
         self.path = anm.filePath
         self.is_looped = anm.loop_flag
@@ -143,10 +236,24 @@ class XfbinAnmChunkPropertyGroup(PropertyGroup):
         if camera:
             camera_prop: CameraPropertyGroup = self.cameras.add()
             camera_prop.init_data(camera)
+
+        self.lightdircs.clear()
+        if lightdirc:
+            lightdirc_prop: LightDircPropertyGroup = self.lightdircs.add()
+            lightdirc_prop.init_data(lightdirc)
+        
+        self.lightpoints.clear()
+        if lightpoint:
+            lightpoint_prop: LightPointPropertyGroup = self.lightpoints.add()
+            lightpoint_prop.init_data(lightpoint)
+
+        self.ambients.clear()
+        if ambient:
+            ambient_prop: AmbientPropertyGroup = self.ambients.add()
+            ambient_prop.init_data(ambient)
+        
+
      
-
-    
-
 
 class AnmChunksListPropertyGroup(PropertyGroup):
     anm_chunks: CollectionProperty(
@@ -155,22 +262,28 @@ class AnmChunksListPropertyGroup(PropertyGroup):
 
     anm_chunk_index: IntProperty()
 
-    def init_data(self, anm_chunks: List[NuccChunkAnm], cam_chunks: List[NuccChunkCamera], context):
+    def init_data(self, anm_chunks: List[NuccChunkAnm], cam_chunks: List[NuccChunkCamera], 
+                lightdirc_chunks: List[NuccChunkLightDirc], lightpoint_chunks: List[NuccChunkLightPoint], ambient_chunks: List[NuccChunkAmbient], context):
+        
         self.anm_chunks.clear()
 
+        cam_dict = {cam.filePath: cam for cam in cam_chunks}
+        lightdirc_dict = {lightdirc.filePath: lightdirc for lightdirc in lightdirc_chunks}
+        lightpoint_dict = {lightpoint.filePath: lightpoint for lightpoint in lightpoint_chunks}
+        ambient_dict = {ambient.filePath: ambient for ambient in ambient_chunks}
+
+
         for anm in anm_chunks:
-            has_camera = False
+            camera = cam_dict.get(anm.filePath, None)
+            lightdirc = lightdirc_dict.get(anm.filePath, None)
+            lightpoint = lightpoint_dict.get(anm.filePath, None)
+            ambient = ambient_dict.get(anm.filePath, None)
 
-            for cam in cam_chunks:
-                if anm.filePath == cam.filePath:
-                    has_camera = True
-                    a: XfbinAnmChunkPropertyGroup = self.anm_chunks.add()
-                    a.init_data(anm, cam, make_actions(anm, context))
-                    break
+            a: XfbinAnmChunkPropertyGroup = self.anm_chunks.add()
+            a.init_data(anm, camera, lightdirc, lightpoint, ambient, make_actions(anm, context))
 
-            if not has_camera:
-                a: XfbinAnmChunkPropertyGroup = self.anm_chunks.add()
-                a.init_data(anm, None, make_actions(anm, context))
+            
+            
 
 class AnmChunksPropertyPanel(Panel):
 
@@ -210,30 +323,98 @@ class AnmChunksPropertyPanel(Panel):
 
             row = box.row()
             row.prop_search(anm, 'anm_name', bpy.data, 'actions', text="Action", icon='ACTION')
+
+
             row.operator('obj.play_animation', text='Play Animation', icon='PLAY')
+
+            row = box.row()
+            row.prop(anm, 'export_material_animations')
+            row.prop(anm, 'clean_keyframes')
+
+
+            clump_box = layout.box()
+            clump_box.label(text="Clumps:")
 
             if len(anm.anm_clumps) > 0:
                 clump = anm.anm_clumps[anm.clump_index]
-                clump_box = layout.box()
-                clump_box.label(text="Clumps:")
+                
                 clump_box.prop(clump, 'name')
 
                 draw_xfbin_list(clump_box, 1, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'anm_clumps', 'clump_index')
                 box = clump_box.box()
-                box.prop_search(anm.anm_clumps[anm.clump_index], 'name', bpy.data, 'objects', text="Clump", icon='OBJECT_DATA')
-
+                box.prop_search(anm.anm_clumps[anm.clump_index], 'name', bpy.data, 'armatures', text="Clump", icon='OBJECT_DATA')
+        
+            else:
+                draw_xfbin_list(clump_box, 1, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'anm_clumps', 'clump_index')
+        
             
             camera_box = layout.box()
             camera_box.label(text="Cameras:")
+
+
             camera = anm.cameras[anm.camera_index] if anm.cameras and anm.camera_index < len(anm.cameras) else None
+
             if camera:
                 camera_box.prop(camera, 'name')
                 camera_box.prop(camera, 'path')
                 draw_xfbin_list(camera_box, 3, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'cameras', 'camera_index')
                 box = camera_box.box()
                 box.prop_search(anm.cameras[anm.camera_index], 'name', bpy.data, 'cameras', text="Camera", icon='CAMERA_DATA')
+                
             else:
                 draw_xfbin_list(camera_box, 3, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'cameras', 'camera_index')
+            
+
+            lightdirc_box = layout.box()
+            lightdirc_box.label(text="Directional Lights:")
+
+            lightdirc = anm.lightdircs[anm.lightdirc_index] if anm.lightdircs and anm.lightdirc_index < len(anm.lightdircs) else None
+
+            if lightdirc:
+                lightdirc_box.prop(lightdirc, 'name')
+                lightdirc_box.prop(lightdirc, 'path')
+
+                draw_xfbin_list(lightdirc_box, 4, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'lightdircs', 'lightdirc_index')
+
+                box = lightdirc_box.box()
+                box.prop_search(anm.lightdircs[anm.lightdirc_index], 'name', bpy.data, 'lights', text="LightDirc", icon='LIGHT')
+            else:
+                draw_xfbin_list(lightdirc_box, 4, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'lightdircs', 'lightdirc_index')
+
+
+            lightpoint_box = layout.box()
+            lightpoint_box.label(text="Point Lights:")
+
+            lightpoint = anm.lightpoints[anm.lightpoint_index] if anm.lightpoints and anm.lightpoint_index < len(anm.lightpoints) else None
+
+            if lightpoint:
+                lightpoint_box.prop(lightpoint, 'name')
+                lightpoint_box.prop(lightpoint, 'path')
+
+                draw_xfbin_list(lightpoint_box, 5, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'lightpoints', 'lightpoint_index')
+
+                box = lightpoint_box.box()
+                box.prop_search(anm.lightpoints[anm.lightpoint_index], 'name', bpy.data, 'lights', text="LightPoint", icon='LIGHT')
+            else:
+                draw_xfbin_list(lightpoint_box, 5, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'lightpoints', 'lightpoint_index')
+
+            ambient_box = layout.box()
+            ambient_box.label(text="Ambient Lights:")
+
+            ambient = anm.ambients[anm.ambient_index] if anm.ambients and anm.ambient_index < len(anm.ambients) else None
+
+            if ambient:
+                ambient_box.prop(ambient, 'name')
+                ambient_box.prop(ambient, 'path')
+
+                draw_xfbin_list(ambient_box, 6, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'ambients', 'ambient_index')
+
+                box = ambient_box.box()
+                box.prop_search(anm.ambients[anm.ambient_index], 'name', bpy.data, 'lights', text="Ambient", icon='WORLD')
+            else:
+                draw_xfbin_list(ambient_box, 6, anm, f'xfbin_anm_chunks_data.anm_chunks[{anm_index}]', 'ambients', 'ambient_index')
+
+            
 
 class PlayAnimation(bpy.types.Operator):
     bl_idname = 'obj.play_animation'
@@ -268,6 +449,7 @@ class PlayAnimation(bpy.types.Operator):
                     clumps.append(c)
    
             for clump in clumps:
+                clump_name = clump.name if not clump.name.endswith(' [C]') else clump.name[:-4]
                 action = bpy.data.actions.get(f'{anm.name} ({clump.name[:-4]})')
 
                 if action:
@@ -284,13 +466,14 @@ class PlayAnimation(bpy.types.Operator):
         return {'FINISHED'}
 
 
-
-
 anm_chunks_property_groups = (
     AnmClumpBonePropertyGroup,
     AnmClumpModelPropertyGroup,
     AnmClumpPropertyGroup,
     CameraPropertyGroup,
+    LightDircPropertyGroup,
+    LightPointPropertyGroup,
+    AmbientPropertyGroup,
     XfbinAnmChunkPropertyGroup,
     AnmChunksListPropertyGroup,
 )

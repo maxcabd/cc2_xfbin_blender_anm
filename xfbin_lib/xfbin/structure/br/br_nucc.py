@@ -1,6 +1,5 @@
 from ...util import *
 from .br_anm import *
-from .br_anm_strm import *
 from .br_nud import *
 from .br_nut import *
 
@@ -457,7 +456,7 @@ class BrNuccChunkMaterial(BrNuccChunk):
         self.groupCount = br.read_uint16()
 
         # 0xFE in Storm 1, 0xCD in JoJo and Storm 4. Should actually find out what it does
-        self.field02 = br.read_uint8()
+        self.alpha = br.read_uint8()
         br.read_uint8()  # 0
 
         self.glare = br.read_float()
@@ -474,7 +473,7 @@ class BrNuccChunkMaterial(BrNuccChunk):
     def __br_write__(self, br: 'BinaryReader', chunkIndexDict: IterativeDict):
         br.write_uint16(len(self.nuccChunk.texture_groups))
 
-        br.write_uint8(self.nuccChunk.field02)
+        br.write_uint8(self.nuccChunk.alpha)
         br.write_uint8(0)
 
         # Usually 0, but can be 0.12 and other numbers
@@ -535,37 +534,6 @@ class BrNuccChunkCoord(BrNuccChunk):
         br.write_float(node.scale)
         br.write_float(node.unkFloat)
         br.write_uint16(node.unkShort)
-
-
-class BrNuccChunkAnmStrm(BrNuccChunk):
-    def init_data(self, br: BinaryReader):
-        super().init_data(br)
-        
-        self.AnmLength = br.read_uint32()
-        self.FrameSize = br.read_uint32()
-        self.FrameCount = br.read_uint16()
-        self.isLooped = br.read_uint16()
-        self.ClumpCount = br.read_uint16()
-        self.OtherEntryCount = br.read_uint16()
-        self.CoordCount = br.read_uint32()
-
-        self.Clumps = br.read_struct(BrStrmClump, self.ClumpCount)
-
-        self.OtherEntryIndices = br.read_uint32(self.OtherEntryCount)
-
-        self.CoordParents = br.read_struct(BrAnmCoordParent, self.CoordCount)
-
-        self.FrameInfo = br.read_struct(BrStrmFrameInfo, self.FrameCount)
-
-
-class BrNuccChunkAnmStrmFrame(BrNuccChunk):
-    def init_data(self, br: BinaryReader,):
-        super().init_data(br)
-
-        self.Frame = br.read_uint32()
-        self.EntryCount = br.read_uint16()
-        self.Unk = br.read_uint16()
-        self.Entries = br.read_struct(BrStrmEntry, self.EntryCount)
 
 
 
@@ -711,3 +679,24 @@ class BrNuccChunkCamera(BrNuccChunk):
 
         self.unk = br.read_uint32()
         self.fov = br.read_float()
+
+
+class BrNuccChunkLightDirc(BrNuccChunk):
+    def init_data(self, br: BinaryReader):
+        super().init_data(br)
+
+        self.data = br.read_bytes(64)
+
+    
+class BrNuccChunkLightPoint(BrNuccChunk):
+    def init_data(self, br: BinaryReader):
+        super().init_data(br)
+
+        self.data = br.read_bytes(64)
+
+class BrNuccChunkAmbient(BrNuccChunk):
+    def init_data(self, br: BinaryReader):
+        super().init_data(br)
+
+        self.color = br.read_float(3)
+        self.strength = br.read_float()

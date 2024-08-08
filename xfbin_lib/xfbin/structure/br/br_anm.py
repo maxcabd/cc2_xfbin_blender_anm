@@ -113,7 +113,7 @@ class BrAnmEntry(BrStruct):
 
             elif header.curve_format == AnmCurveFormat.BYTE3:  # 0x14
                 for i in range(header.keyframe_count):
-                    curve[i] = br.read_int8(3)
+                    curve[i] = br.read_uint8(3)
 
             elif header.curve_format == AnmCurveFormat.FLOAT3ALT2:  # 0x15
                 for i in range(header.keyframe_count):

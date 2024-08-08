@@ -12,15 +12,17 @@ from mathutils import Matrix, Quaternion, Vector, Euler
 
 from ..xfbin_lib.xfbin.structure.anm import (AnmDataPath, AnmEntry,
                                              AnmEntryFormat)
-from ..xfbin_lib.xfbin.structure.nucc import (CoordNode, NuccChunkAnm, NuccChunkCamera,
-                                              NuccChunkDynamics,
-                                              NuccChunkClump, NuccChunkModel,
-                                              NuccChunkModelHit,
-                                              NuccChunkModelPrimitiveBatch,
-                                              NuccChunkPrimitiveVertex,
-                                              PrimitiveVertex,
-                                              NuccChunkTexture,
-                                              NuccChunkMaterial)
+from ..xfbin_lib.xfbin.structure.nucc import (CoordNode, NuccChunkAnm, NuccChunkCamera, 
+                                            NuccChunkLightDirc,
+                                            NuccChunkLightPoint,
+                                            NuccChunkAmbient,
+                                            NuccChunkDynamics,
+                                            NuccChunkClump, NuccChunkModel,
+                                            NuccChunkModelHit,
+                                            NuccChunkModelPrimitiveBatch,
+                                            NuccChunkTexture,
+                                            NuccChunkMaterial)
+
 from ..xfbin_lib.xfbin.structure.nud import NudMesh
 from ..xfbin_lib.xfbin.structure.xfbin import Xfbin
 from ..xfbin_lib.xfbin.xfbin_reader import read_xfbin
@@ -136,13 +138,6 @@ class XfbinImporter:
                 continue
 
             clump: NuccChunkClump = clump[0]
-
-            # Clear unsupported chunks to avoid issues
-            '''if clump.clear_non_model_chunks() > 0:
-                print(clump.clear_non_model_chunks())
-                self.operator.report(
-                    {'WARNING'}, f'Some chunks in {clump.name} have unsupported types and will not be imported')'''
-
             armature_obj = self.make_armature(clump, context)
             self.make_objects(clump, armature_obj, context)
 
@@ -166,10 +161,16 @@ class XfbinImporter:
         
         anm_chunks: List[NuccChunkAnm] = list()
         cam_chunks: List[NuccChunkCamera] = list()
+        lightdirc_chunks: List[NuccChunkLightDirc] = list()
+        lightpoint_chunks: List[NuccChunkLightPoint] = list()
+        ambient_chunks: List[NuccChunkLightPoint] = list()
 
         for page in self.xfbin.get_pages_by_type('NuccChunkAnm'):
             anm_chunks.extend(page.get_chunks_by_type('NuccChunkAnm'))
             cam_chunks.extend(page.get_chunks_by_type('NuccChunkCamera'))
+            lightdirc_chunks.extend(page.get_chunks_by_type('NuccChunkLightDirc'))
+            lightpoint_chunks.extend(page.get_chunks_by_type('NuccChunkLightPoint'))
+            ambient_chunks.extend(page.get_chunks_by_type('NuccChunkAmbient'))
 
 
         # Create an empty object to store the anm chunks list
@@ -179,11 +180,11 @@ class XfbinImporter:
 
         self.collection.objects.link(empty_anm)
 
-        empty_anm.xfbin_anm_chunks_data.init_data(anm_chunks, cam_chunks, context)
+        empty_anm.xfbin_anm_chunks_data.init_data(anm_chunks, cam_chunks, lightdirc_chunks, lightpoint_chunks, ambient_chunks, context)
 
-        for anm in anm_chunks: # Create camera objects for each anm that has a camera chunk
+        for anm in anm_chunks: # Create camera and light objects for each anm if they exist
             for cam in cam_chunks:
-                if anm.filePath != cam.filePath: # If cam and anm have same filepath they're in the same page
+                if anm.filePath != cam.filePath:
                     continue
                 
                 anm: NuccChunkAnm
@@ -201,6 +202,69 @@ class XfbinImporter:
                 # Link the camera to the collection and to animation empty
                 self.collection.objects.link(camera)
                 camera.parent = empty_anm
+            
+            for lightdirc in lightdirc_chunks:
+                if anm.filePath != lightdirc.filePath:
+                    continue
+
+                anm: NuccChunkAnm
+                lightdirc: NuccChunkLightDirc
+
+                lightdirc_data = bpy.data.lights.new(f"{lightdirc.name} ({anm.name})", 'SUN')
+        
+                light_dirc = bpy.data.objects.new(f"{lightdirc.name} ({anm.name})", lightdirc_data)
+                light_dirc.rotation_mode = 'QUATERNION'
+                light_dirc.animation_data_create()
+                light_dirc.animation_data.action = bpy.data.actions.get(f"{anm.name} (lightdirc)")
+                
+
+                self.collection.objects.link(light_dirc)
+                light_dirc.parent = empty_anm
+            
+            for lightpoint in lightpoint_chunks:
+                if anm.filePath != lightpoint.filePath:
+                    continue
+
+                anm: NuccChunkAnm
+                lightpoint: NuccChunkLightPoint
+
+                lightpoint_data = bpy.data.lights.new(f"{lightpoint.name} ({anm.name})", 'POINT')
+                lightpoint_data.use_custom_distance = True
+        
+                light_point = bpy.data.objects.new(f"{lightpoint.name} ({anm.name})", lightpoint_data)
+                light_point.rotation_mode = 'QUATERNION'
+                light_point.animation_data_create()
+                light_point.animation_data.action = bpy.data.actions.get(f"{anm.name} (lightpoint)")
+                
+                self.collection.objects.link(light_point)
+                light_point.parent = empty_anm
+
+            for ambient in ambient_chunks:
+                if anm.filePath != ambient.filePath:
+                    continue
+
+                anm: NuccChunkAnm
+                ambient: NuccChunkAmbient
+
+
+                # Since ambient light is environment light, we need to use the World settings
+                # Therefore, we don't need to create a light object for it but a World object to the scene
+
+
+                world = bpy.data.worlds.new(f"{ambient.name} ({anm.name})")
+                world.use_nodes = True
+
+
+                world.node_tree.nodes.new('ShaderNodeBackground')
+                world.node_tree.nodes["Background"].inputs[0].default_value = (ambient.color[0], ambient.color[1], ambient.color[2], 1)
+                world.node_tree.nodes["Background"].inputs[1].default_value = ambient.strength
+
+                world.animation_data_create()
+                world.animation_data.action = bpy.data.actions.get(f"{anm.name} (ambient)")
+
+               
+                context.scene.world = world
+                
 
     def make_collection(self, context) -> bpy.types.Collection:
         """
@@ -697,30 +761,11 @@ class XfbinImporter:
                 # print(e)
                 pass
 
-        # Color
-        '''if len(mesh.vertices) and mesh.vertices[0].color:
-            col_layer = bm.loops.layers.float_color.new("Color")
-            for face in bm.faces:
-                for loop in face.loops:
-                    color = mesh.vertices[loop.vert.index].color
-                    loop[col_layer] = list(map(lambda x: x / 255, color))'''
-            
-
-        # UVs
-        '''if len(mesh.vertices) and mesh.vertices[0].uv:
-            # We can have multiple UV channels - the first one will be set by default
-            for i in range(len(mesh.vertices[0].uv)):
-                uv_layer = bm.loops.layers.uv.new(f"UV_{i}")
-                for face in bm.faces:
-                    for loop in face.loops:
-                        original_uv = mesh.vertices[loop.vert.index].uv[i]
-                        loop[uv_layer].uv = uv_to_blender(original_uv)'''
-
         return bm
     
 
 def make_actions(anm: NuccChunkAnm, context) -> List[Action]:
-    actions = list()
+    actions: List[bpy.types.Action] = list()
 
     try:
         for entry in anm.other_entries:
@@ -730,11 +775,13 @@ def make_actions(anm: NuccChunkAnm, context) -> List[Action]:
             if not len(anm.clumps):
                 continue
 
+        
             action = bpy.data.actions.new(
                 f'{anm.name} ({AnmEntryFormat(entry.entry_format).name.lower()})')
             
             group_name = action.groups.new(anm.name).name
 
+           
             for curve in entry.curves:
                 if curve is None or (not len(curve.keyframes)) or curve.data_path == AnmDataPath.UNKNOWN:
                     continue
@@ -746,24 +793,59 @@ def make_actions(anm: NuccChunkAnm, context) -> List[Action]:
                     map(lambda x: x.value, curve.keyframes)))
 
                 if curve.data_path == AnmDataPath.CAMERA:
-                    # TODO: change camera rotation mode to quaternion, and lens unit to FOV
-                    # This should be done on playing the animation chunk
                     data_path = 'data.lens'
+                
+                elif curve.data_path == AnmDataPath.COLOR:
+                    data_path = 'data.color'
+                
+                elif curve.data_path == AnmDataPath.ENERGY:
+                    data_path = 'data.energy'
+
+                elif curve.data_path == AnmDataPath.RADIUS:
+                    data_path = 'data.shadow_soft_size'
+
+                elif curve.data_path == AnmDataPath.CUTOFF:
+                    data_path = 'data.cutoff_distance'
+
                 else:
                     data_path = f'{AnmDataPath(curve.data_path).name.lower()}'
-
-
+                
+            
                 for i in range(len(values[0])):
                     fc = action.fcurves.new(
                         data_path=data_path, index=i, action_group=group_name)
                     fc.keyframe_points.add(len(frames))
                     fc.keyframe_points.foreach_set('co', [x for co in list(
                         map(lambda f, v: (f, v[i]), frames, values)) for x in co])
-
                     fc.update()
                 
-                
+                if entry.entry_format == AnmEntryFormat.AMBIENT:
+                    world = bpy.data.worlds["World"]
+                    if not world.use_nodes:
+                        world.use_nodes = True
 
+                    node_tree = world.node_tree
+
+                    if "Background" not in node_tree.nodes:
+                        bg_node = node_tree.nodes.new(type='ShaderNodeBackground')
+                        bg_node.name = "Background"
+                    else:
+                        bg_node = node_tree.nodes["Background"]
+                    
+                    if curve.data_path == AnmDataPath.COLOR:
+                        for i in range(4):  # RGBA
+                            fc = action.fcurves.new(
+                                data_path=f'node_tree.nodes["Background"].inputs[0].default_value', 
+                                index=i, 
+                                action_group=group_name
+                            )
+                            fc.keyframe_points.add(len(frames))
+                            fc.keyframe_points.foreach_set('co', [x for co in list(
+                                map(lambda f, v: (f, v[i]), frames, values)) for x in co])
+                            fc.update()
+                      
+       
+        
         for clump in anm.clumps:
             action = bpy.data.actions.new(f'{anm.name} ({clump.name})')
 
@@ -844,6 +926,53 @@ def make_actions(anm: NuccChunkAnm, context) -> List[Action]:
 
                         fc.update()
 
+            """for clump in anm.clumps:
+                for material in clump.materials:
+                    action = bpy.data.actions.new(f'{anm.name} ({material.name})')
+
+                    group_name = action.groups.new(anm.name).name
+
+
+                    node_tree = bpy.data.materials.get(material.name).node_tree
+                    mapping_node = node_tree.nodes.get("Mapping")
+
+                  
+                    if mapping_node is None:
+                        mapping_node = node_tree.nodes.new(type='ShaderNodeMapping')
+                        mapping_node.name = "Mapping"
+                        mapping_node.location = (0, 0)
+                
+                    for curve in material.anm_entry.curves:
+                        if curve is None or (not len(curve.keyframes)) or curve.data_path == AnmDataPath.UNKNOWN:
+                            continue
+
+                        frames = list(map(lambda x: frame_to_blender(x.frame), curve.keyframes))
+                        values = list(map(lambda x: x.value, curve.keyframes))
+
+                        
+
+                        if curve.data_path == AnmDataPath.U1_LOCATION:
+                            for frame, value in zip(frames, values):
+                                mapping_node.inputs['Location'].default_value[0] = value[0]
+                                mapping_node.inputs['Location'].keyframe_insert(data_path="default_value", index=0, frame=frame, group=group_name)
+
+
+                        if curve.data_path == AnmDataPath.V1_LOCATION:
+                            for frame, value in zip(frames, values):
+                                mapping_node.inputs['Location'].default_value[1] = value[0]
+                                mapping_node.inputs['Location'].keyframe_insert(data_path="default_value", index=1, frame=frame, group=group_name)
+                        
+                        if curve.data_path == AnmDataPath.U1_SCALE:
+                            for frame, value in zip(frames, values):
+                                mapping_node.inputs['Scale'].default_value[0] = value[0]
+                                mapping_node.inputs['Scale'].keyframe_insert(data_path="default_value", index=0, frame=frame, group=group_name)
+                        
+                        if curve.data_path == AnmDataPath.V1_SCALE:
+                            for frame, value in zip(frames, values):
+                                mapping_node.inputs['Scale'].default_value[1] = value[0]
+                                mapping_node.inputs['Scale'].keyframe_insert(data_path="default_value", index=1, frame=frame, group=group_name)"""
+                                
+
             actions.append(action)
     except Exception as e:
         print(e)
@@ -853,7 +982,6 @@ def make_actions(anm: NuccChunkAnm, context) -> List[Action]:
     context.scene.render.fps = 30
 
     return actions
-
 
 
 

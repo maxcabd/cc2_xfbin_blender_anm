@@ -102,7 +102,7 @@ class XfbinMaterialPropertyGroup(PropertyGroup):
     )
 
     field02: IntProperty(
-        name='Field02',
+        name='Alpha',
         min=0,
         max=255,
     )
@@ -128,7 +128,7 @@ class XfbinMaterialPropertyGroup(PropertyGroup):
     def init_data(self, material: NuccChunkMaterial):
         self.material_name = material.name
 
-        self.field02 = material.field02
+        self.alpha = material.alpha
         self.glare = material.glare
 
         self.float_format = int_to_hex_str(material.format, 1)
@@ -400,7 +400,7 @@ class XfbinMaterialPropertyPanel(Panel):
             box.prop(material, 'material_name')
 
             row = box.row()
-            row.prop(material, 'field02')
+            row.prop(material, 'alpha')
             row.prop(material, 'glare')
 
             box.prop(material, 'float_format')

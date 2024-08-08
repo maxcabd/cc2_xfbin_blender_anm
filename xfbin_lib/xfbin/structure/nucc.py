@@ -3,6 +3,7 @@ from typing import Dict, Iterator, List, Optional, Set
 
 from ..util import *
 from .anm import AnmClump, AnmEntry
+
 from .br.br_nucc import *
 from .br.br_nud import *
 from .br.br_nut import *
@@ -63,7 +64,6 @@ class NuccChunk:
         d['Name'] = self.name
         d['Type'] = NuccChunk.get_nucc_str_from_type(type(self))
         d['Path'] = self.filePath
-        d['Version'] = hex(self.version)
 
         return d
 
@@ -452,7 +452,7 @@ class NuccChunkMaterial(NuccChunk):
         self.has_data = True
         self.has_props = True
 
-        self.field02 = br_chunk.field02
+        self.alpha = br_chunk.alpha
         self.glare = br_chunk.glare
 
         self.format = br_chunk.format
@@ -488,27 +488,6 @@ class MaterialTextureGroup:
 
     def __iter__(self):
         return iter(self.texture_chunks)
-
-
-class NuccChunkAnmStrm(BrNuccChunk):
-    def init_data(self, br_chunk: BrNuccChunkAnmStrm, chunk_list: List['NuccChunk'], chunk_indices: List[int], chunk_refs: List['ChunkReference']):
-        
-        self.data = br_chunk.data
-        #self.version = br_chunk.version
-        self.has_data = True
-        self.has_props = False
-
-        self.anm_length = br_chunk.AnmLength
-        self.frame_size = br_chunk.FrameSize
-        self.loop_anm = br_chunk.isLooped
-        self.clump_count = br_chunk.ClumpCount
-        self.other_entry_count = br_chunk.OtherEntryCount
-        self.coord_count = br_chunk.CoordCount
-
-        self.clumps: List[AnmClump] = list()
-        self.other_entry_indices = br_chunk.OtherEntryIndices
-        self.coord_parents = br_chunk.CoordParents
-        self.frames = []
 
 
 class NuccChunkModelHit(NuccChunk):
@@ -634,3 +613,34 @@ class NuccChunkCamera(NuccChunk):
         self.extension = '.camera'
 
         self.fov = br_chunk.fov
+
+
+class NuccChunkLightDirc(NuccChunk):
+    def init_data(self, br_chunk: BrNuccChunkLightDirc, chunk_list: List['NuccChunk'], chunk_indices: List[int], chunk_refs: List):
+        self.data = br_chunk.data
+        self.has_data = True
+        self.has_props = False
+        self.extension = '.lightdirc'
+
+        self.data = br_chunk.data
+
+
+class NuccChunkLightPoint(NuccChunk):
+    def init_data(self, br_chunk: BrNuccChunkLightPoint, chunk_list: List['NuccChunk'], chunk_indices: List[int], chunk_refs: List):
+        self.data = br_chunk.data
+        self.has_data = True
+        self.has_props = False
+        self.extension = '.lightpoint'
+
+        self.data = br_chunk.data
+
+
+class NuccChunkAmbient(NuccChunk):
+    def init_data(self, br_chunk: BrNuccChunkAmbient, chunk_list: List['NuccChunk'], chunk_indices: List[int], chunk_refs: List):
+        self.data = br_chunk.data
+        self.has_data = True
+        self.has_props = False
+        self.extension = '.ambient'
+
+        self.color = br_chunk.color
+        self.strength = br_chunk.strength

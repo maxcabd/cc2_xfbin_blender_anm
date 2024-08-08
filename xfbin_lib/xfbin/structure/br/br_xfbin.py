@@ -288,10 +288,6 @@ class BrChunkReference(BrStruct):
     def __br_write__(self, br: 'BinaryReader', chunk_reference: ChunkReference, chunk_name_indices, chunkMapDict):
         # These are supposed to always exist. If they do not, then the xfbin somehow lost some data, and we can't
         # really recover from that anyway
-        #print(chunk_name_indices)
-        print(f'reference {chunk_reference}')
-        print(f'name {chunk_reference.name}')
-        print(f'chunk {chunk_reference.chunk}')
         br.write_uint32(chunk_name_indices[chunk_reference.name])
         br.write_uint32(chunkMapDict[chunk_reference.chunk])
 
