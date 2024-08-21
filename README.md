@@ -12,6 +12,8 @@ Open the `Edit` -> `Preferences` window from the menu bar, go to `Add-ons`, clic
 Check the [wiki](https://github.com/SutandoTsukai181/cc2_xfbin_blender/wiki) for guides and usage info.
 
 # Credits
+Fork of [cc2_xfbin_blender](https://github.com/mosamadeeb/cc2_xfbin_blender) which is now archived.
+
 Huge thanks to [TheTurboTurnip](https://github.com/theturboturnip) for his help with Blender related stuff, and for making the [Yakuza model importer/exporter](https://github.com/theturboturnip/yk_gmd_io) script, which was used as a reference for this project.
 
 Thanks to the [Smash Forge](https://github.com/jam1garner/Smash-Forge) team for their NUD models and NUT textures implementation, which the NuccChunkModel and NuccChunkTexture classes use, respectively.
